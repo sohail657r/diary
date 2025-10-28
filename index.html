@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,9 +15,6 @@
       text-align: center;
       color: #2b6cb0;
     }
-    h2 {
-      margin-top: 0;
-    }
     .client {
       background: white;
       border-radius: 8px;
@@ -24,19 +22,25 @@
       margin: 20px 0;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .client h2 {
-      color: #2d3748;
-      cursor: pointer;
+    .client-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
+    .client-actions button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-left: 8px;
+      font-size: 16px;
+      color: #2b6cb0;
+    }
+    .client-actions button:hover {
+      color: #1a4b8a;
+    }
     input, button {
       padding: 8px;
       margin: 5px;
-    }
-    button {
-      cursor: pointer;
     }
     table {
       width: 100%;
@@ -54,13 +58,6 @@
     .total {
       font-weight: bold;
       color: green;
-    }
-    .add-client-form {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      margin-bottom: 30px;
     }
     .fold-content {
       display: none;
@@ -90,6 +87,7 @@
       border: none;
       border-radius: 5px;
       padding: 6px 10px;
+      cursor: pointer;
     }
     .pdf-buttons button:hover {
       background: #1a4b8a;
@@ -125,10 +123,6 @@
       text-align: center;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     }
-    .report-content h3 {
-      margin-top: 0;
-      color: #2b6cb0;
-    }
     .close-btn {
       background: #e53e3e;
       color: white;
@@ -146,7 +140,6 @@
 <body>
   <h1>🥛 AL-NOOR DAIRY 🐄<br>Milk Supply Management System</h1>
 
-  <!-- Add New Client Form -->
   <div class="add-client-form">
     <h3>Add New Client</h3>
     <input type="text" id="client-name" placeholder="Client Name" required />
@@ -154,13 +147,10 @@
     <button onclick="addClient()">Add Client</button>
   </div>
 
-  <!-- Total Report Button -->
   <button class="total-report-btn" onclick="showTotalReport()">📊 Show Overall Total Report</button>
 
-  <!-- Clients List Container -->
   <div id="clients-container"></div>
 
-  <!-- Report Modal -->
   <div id="report-modal">
     <div class="report-content">
       <h3>AL-NOOR DAIRY – Overall Report</h3>
@@ -169,7 +159,6 @@
     </div>
   </div>
 
-  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -189,10 +178,15 @@
         div.className = "client";
 
         div.innerHTML = `
-          <h2 onclick="toggleFold('${client.name}')">
-            ${client.name}
-            <button class="toggle-btn" id="toggle-${client.name}">+</button>
-          </h2>
+          <div class="client-header">
+            <h2 onclick="toggleFold('${client.name}')">${client.name}</h2>
+            <div class="client-actions">
+              <button onclick="editClient('${client.name}')">✏️</button>
+              <button onclick="deleteClient('${client.name}')">🗑️</button>
+              <button class="toggle-btn" id="toggle-${client.name}">+</button>
+            </div>
+          </div>
+
           <div class="fold-content" id="fold-${client.name}">
             <div class="pdf-buttons">
               <button onclick="downloadPDF('${client.name}')">📄 Download PDF</button>
@@ -216,22 +210,19 @@
                     <th>Quantity (L)</th>
                     <th>Price (Rs./L)</th>
                     <th>Total (Rs.)</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
                 <tfoot>
                   <tr>
-                    <td colspan="3" class="total">Monthly Total:</td>
+                    <td colspan="4" class="total">Monthly Total:</td>
                     <td id="total-${client.name}" class="total">0</td>
                   </tr>
                 </tfoot>
               </table>
 
-              <div class="summary" id="summary-${client.name}">
-                <p><strong>Total Liters:</strong> 0 L</p>
-                <p><strong>Days Milk Supplied:</strong> 0</p>
-                <p><strong>Days Missed:</strong> 0</p>
-              </div>
+              <div class="summary" id="summary-${client.name}"></div>
             </div>
           </div>
         `;
@@ -262,6 +253,10 @@
       const name = document.getElementById("client-name").value.trim();
       const price = parseFloat(document.getElementById("client-price").value);
       if (name && price) {
+        if (clients.some(c => c.name === name)) {
+          alert("Client already exists!");
+          return;
+        }
         clients.push({ name, defaultPrice: price, data: [] });
         saveClients();
         renderClients();
@@ -272,16 +267,36 @@
       }
     }
 
+    function editClient(name) {
+      const client = clients.find(c => c.name === name);
+      const newName = prompt("Enter new name:", client.name);
+      const newPrice = parseFloat(prompt("Enter new default price:", client.defaultPrice));
+      if (newName && !isNaN(newPrice)) {
+        client.name = newName.trim();
+        client.defaultPrice = newPrice;
+        saveClients();
+        renderClients();
+      } else {
+        alert("Invalid input!");
+      }
+    }
+
+    function deleteClient(name) {
+      if (confirm(`Are you sure you want to delete ${name}?`)) {
+        clients = clients.filter(c => c.name !== name);
+        saveClients();
+        renderClients();
+      }
+    }
+
     function addEntry(e, clientName) {
       e.preventDefault();
       const client = clients.find(c => c.name === clientName);
       const date = document.getElementById(`date-${clientName}`).value;
       const qty = parseFloat(document.getElementById(`qty-${clientName}`).value);
       const price = parseFloat(document.getElementById(`price-${clientName}`).value);
-      const total = qty * price;
-
       if (!date || isNaN(qty) || isNaN(price)) return;
-
+      const total = qty * price;
       client.data.push({ date, qty, price, total });
       saveClients();
       renderTable(clientName);
@@ -293,70 +308,85 @@
       const client = clients.find(c => c.name === clientName);
       const tbody = document.querySelector(`#table-${clientName} tbody`);
       tbody.innerHTML = "";
-
-      client.data.forEach(entry => {
+      client.data.forEach((entry, index) => {
         const row = document.createElement("tr");
         row.innerHTML = `
           <td>${entry.date}</td>
           <td>${entry.qty.toFixed(1)}</td>
           <td>${entry.price.toFixed(2)}</td>
           <td>${entry.total.toFixed(2)}</td>
+          <td>
+            <button onclick="editEntry('${clientName}', ${index})">✏️</button>
+            <button onclick="deleteEntry('${clientName}', ${index})">🗑️</button>
+          </td>
         `;
         tbody.appendChild(row);
       });
-
       const total = client.data.reduce((sum, e) => sum + e.total, 0);
       document.getElementById(`total-${clientName}`).textContent = total.toFixed(2);
+    }
+
+    function editEntry(clientName, index) {
+      const client = clients.find(c => c.name === clientName);
+      const entry = client.data[index];
+
+      const newDate = prompt("Edit date (YYYY-MM-DD):", entry.date);
+      const newQty = parseFloat(prompt("Edit quantity (L):", entry.qty));
+      const newPrice = parseFloat(prompt("Edit price (Rs./L):", entry.price));
+
+      if (newDate && !isNaN(newQty) && !isNaN(newPrice)) {
+        entry.date = newDate;
+        entry.qty = newQty;
+        entry.price = newPrice;
+        entry.total = newQty * newPrice;
+        saveClients();
+        renderTable(clientName);
+        updateSummary(clientName);
+      } else {
+        alert("Invalid input. Please try again.");
+      }
+    }
+
+    function deleteEntry(clientName, index) {
+      const client = clients.find(c => c.name === clientName);
+      if (confirm("Delete this entry?")) {
+        client.data.splice(index, 1);
+        saveClients();
+        renderTable(clientName);
+        updateSummary(clientName);
+      }
     }
 
     function updateSummary(clientName) {
       const client = clients.find(c => c.name === clientName);
       const totalLiters = client.data.reduce((sum, e) => sum + e.qty, 0);
-      const uniqueDates = new Set(client.data.map(e => e.date));
-      const suppliedDays = uniqueDates.size;
-
-      const today = new Date();
-      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-      const missedDays = daysInMonth - suppliedDays;
-
-      const summary = document.getElementById(`summary-${clientName}`);
-      summary.innerHTML = `
+      const suppliedDays = new Set(client.data.map(e => e.date)).size;
+      const missedDays = Math.max(0, 30 - suppliedDays);
+      document.getElementById(`summary-${clientName}`).innerHTML = `
         <p><strong>Total Liters:</strong> ${totalLiters.toFixed(1)} L</p>
         <p><strong>Days Milk Supplied:</strong> ${suppliedDays}</p>
         <p><strong>Days Missed:</strong> ${missedDays}</p>
       `;
     }
 
-    // 📊 Show total report of all clients
     function showTotalReport() {
       if (clients.length === 0) {
         alert("No clients added yet!");
         return;
       }
-
-      let totalLiters = 0;
-      let totalAmount = 0;
-      let totalDays = 0;
-
-      clients.forEach(client => {
-        totalLiters += client.data.reduce((sum, e) => sum + e.qty, 0);
-        totalAmount += client.data.reduce((sum, e) => sum + e.total, 0);
-        totalDays += new Set(client.data.map(e => e.date)).size;
+      let totalLiters = 0, totalAmount = 0, totalDays = 0;
+      clients.forEach(c => {
+        totalLiters += c.data.reduce((s, e) => s + e.qty, 0);
+        totalAmount += c.data.reduce((s, e) => s + e.total, 0);
+        totalDays += new Set(c.data.map(e => e.date)).size;
       });
-
-      const today = new Date();
-      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-      const avgMissedDays = (daysInMonth * clients.length) - totalDays;
-
       const reportBody = document.getElementById("report-body");
       reportBody.innerHTML = `
         <p><strong>Total Clients:</strong> ${clients.length}</p>
         <p><strong>Total Milk Supplied:</strong> ${totalLiters.toFixed(1)} L</p>
         <p><strong>Total Payment:</strong> Rs. ${totalAmount.toFixed(2)}</p>
         <p><strong>Total Days Milk Supplied:</strong> ${totalDays}</p>
-        <p><strong>Total Missed Days (All Clients):</strong> ${avgMissedDays}</p>
       `;
-
       document.getElementById("report-modal").style.display = "flex";
     }
 
@@ -364,18 +394,16 @@
       document.getElementById("report-modal").style.display = "none";
     }
 
-    // PDF + Share functions (same as before)
     async function downloadPDF(clientName) {
       const element = document.getElementById(`pdf-content-${clientName}`);
       const { jsPDF } = window.jspdf;
       const canvas = await html2canvas(element, { scale: 2 });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 190;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.text("AL-NOOR DAIRY", 10, 10);
       pdf.text(clientName + " - Milk Record", 10, 20);
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 10, 30, imgWidth, imgHeight);
       pdf.save(`${clientName}_Milk_Record.pdf`);
     }
