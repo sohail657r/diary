@@ -1,0 +1,148 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AL-NOOR DAIRY | Milk Supply Management</title>
+  <style>
+    body {font-family: Arial, sans-serif; margin: 30px; background: #f7f7f7;}
+    h1 {text-align: center; color: #2b6cb0;}
+    .client {background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+    .toggle-btn {background: none; border: none; font-size: 20px; cursor: pointer; color: #2b6cb0;}
+    .fold-content {display: none;}
+    .summary {background: #f0fff4; padding: 10px; border-radius: 6px; margin-top: 10px;}
+    .total-report-btn {display: block; margin: 20px auto; background: #38a169; color: white; border: none; border-radius: 6px; padding: 10px 20px; font-size: 16px; cursor: pointer;}
+    .total-report-btn:hover {background: #2f855a;}
+    #report-modal {display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;}
+    .report-content {background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; text-align: center;}
+    .close-btn {background: #e53e3e; color: white; border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer;}
+  </style>
+</head>
+<body>
+  <h1>🥛 AL-NOOR DAIRY 🐄<br>Milk Supply Management System</h1>
+
+  <div class="add-client-form">
+    <h3>Add New Client</h3>
+    <input type="text" id="client-name" placeholder="Client Name" required />
+    <input type="number" id="client-price" placeholder="Default Price (Rs.)" required />
+    <button onclick="addClient()">Add Client</button>
+  </div>
+
+  <button class="total-report-btn" onclick="showTotalReport()">📊 Show Overall Total Report</button>
+
+  <div id="clients-container"></div>
+
+  <!-- Total Report Modal -->
+  <div id="report-modal">
+    <div class="report-content">
+      <h3>AL-NOOR DAIRY – Overall Report</h3>
+      <div id="report-body"></div>
+      <button class="close-btn" onclick="closeReport()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    let clients = JSON.parse(localStorage.getItem("clients")) || [];
+
+    function saveClients(){localStorage.setItem("clients", JSON.stringify(clients));}
+
+    function renderClients(){
+      const container=document.getElementById("clients-container");
+      container.innerHTML="";
+      clients.forEach(client=>{
+        const div=document.createElement("div");
+        div.className="client";
+        div.innerHTML=`
+          <h2 onclick="toggleFold('${client.name}')">${client.name}
+            <button class="toggle-btn" id="toggle-${client.name}">+</button>
+          </h2>
+          <div class="fold-content" id="fold-${client.name}">
+            <p>Default Price per Liter: Rs. ${client.defaultPrice}</p>
+            <form onsubmit="addEntry(event,'${client.name}')">
+              <input type="date" id="date-${client.name}" required />
+              <input type="number" id="qty-${client.name}" placeholder="Liters" min="0" step="0.1" required />
+              <input type="number" id="price-${client.name}" placeholder="Price (Rs.)" step="0.1" value="${client.defaultPrice}" />
+              <button type="submit">Add Entry</button>
+            </form>
+            <div class="summary" id="summary-${client.name}"></div>
+          </div>`;
+        container.appendChild(div);
+        const today=new Date().toISOString().split('T')[0];
+        document.getElementById(`date-${client.name}`).value=today;
+        updateSummary(client.name);
+      });
+    }
+
+    function toggleFold(name){
+      const content=document.getElementById(`fold-${name}`);
+      const btn=document.getElementById(`toggle-${name}`);
+      if(content.style.display==="none"||!content.style.display){content.style.display="block";btn.textContent="−";}
+      else{content.style.display="none";btn.textContent="+";}
+    }
+
+    function addClient(){
+      const name=document.getElementById("client-name").value.trim();
+      const price=parseFloat(document.getElementById("client-price").value);
+      if(name&&price){clients.push({name,defaultPrice:price,data:[]});saveClients();renderClients();}
+      else alert("Please fill both fields.");
+    }
+
+    function addEntry(e,name){
+      e.preventDefault();
+      const c=clients.find(x=>x.name===name);
+      const date=document.getElementById(`date-${name}`).value;
+      const qty=parseFloat(document.getElementById(`qty-${name}`).value);
+      const price=parseFloat(document.getElementById(`price-${name}`).value);
+      if(!date||isNaN(qty)||isNaN(price))return;
+      c.data.push({date,qty,price,total:qty*price});
+      saveClients();updateSummary(name);e.target.reset();
+    }
+
+    function updateSummary(name){
+      const c=clients.find(x=>x.name===name);
+      const totalLiters=c.data.reduce((s,e)=>s+e.qty,0);
+      const suppliedDays=new Set(c.data.map(e=>e.date)).size;
+      const today=new Date();
+      const daysInMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+      const missed=daysInMonth-suppliedDays;
+      document.getElementById(`summary-${name}`).innerHTML=`
+        <p><strong>Total Liters:</strong> ${totalLiters.toFixed(1)} L</p>
+        <p><strong>Days Milk Supplied:</strong> ${suppliedDays}</p>
+        <p><strong>Days Missed:</strong> ${missed}</p>`;
+    }
+
+    // ✅ FIXED OVERALL REPORT FUNCTION
+    function showTotalReport(){
+      if(clients.length===0){alert("No clients added yet!");return;}
+
+      let totalLiters=0, totalAmount=0;
+      let allDates=new Set();
+
+      clients.forEach(c=>{
+        totalLiters+=c.data.reduce((s,e)=>s+e.qty,0);
+        totalAmount+=c.data.reduce((s,e)=>s+e.total,0);
+        c.data.forEach(e=>allDates.add(e.date));
+      });
+
+      const suppliedDays=allDates.size;
+      const today=new Date();
+      const daysInMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+      const missedDays=daysInMonth-suppliedDays;
+
+      document.getElementById("report-body").innerHTML=`
+        <p><strong>Total Clients:</strong> ${clients.length}</p>
+        <p><strong>Total Milk Supplied:</strong> ${totalLiters.toFixed(1)} L</p>
+        <p><strong>Total Payment:</strong> Rs. ${totalAmount.toFixed(2)}</p>
+        <p><strong>Total Days Milk Supplied (any client):</strong> ${suppliedDays}</p>
+        <p><strong>Days with No Supply (all clients):</strong> ${missedDays}</p>
+      `;
+      document.getElementById("report-modal").style.display="flex";
+    }
+
+    function closeReport(){document.getElementById("report-modal").style.display="none";}
+
+    renderClients();
+  </script>
+</body>
+</html>
